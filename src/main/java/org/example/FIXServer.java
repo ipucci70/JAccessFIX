@@ -2,9 +2,11 @@ package org.example;
 
 import quickfix.*;
 import quickfix.field.*;
-import quickfix.fix44.*;
+import quickfix.fix44.QuoteRequest;
+import quickfix.fix44.Quote;
+import quickfix.fix44.QuoteResponse;
 
-public class QuoteApp extends MessageCracker implements Application {
+public class FIXServer extends MessageCracker implements Application {
     @Override
     public void onCreate(SessionID sessionId) {
         System.out.println("Session created: " + sessionId);
@@ -41,16 +43,19 @@ public class QuoteApp extends MessageCracker implements Application {
         crack(message, sessionId);
     }
 
+
     // Handle Quote Request (MsgType = R)
-    @Override
-    public void onMessage(QuoteRequest message, SessionID sessionId) throws FieldNotFound {
+    //@Override
+    public void onMessage(QuoteRequest message, SessionID sessionId) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue {
         System.out.println("Processing Quote Request...");
 
         String quoteReqId = message.getQuoteReqID().getValue();
         System.out.println("QuoteReqID: " + quoteReqId);
 
-        for (QuoteRequest.NoRelatedSym group : message.getGroups(NoRelatedSym.FIELD)) {
-            String symbol = group.getSymbol().getValue();
+        for (Group group : message.getGroups(NoRelatedSym.FIELD)) {
+
+            QuoteRequest.NoRelatedSym noRelatedSym = (QuoteRequest.NoRelatedSym) group;
+            String symbol = noRelatedSym.getSymbol().getValue();
             System.out.println("Requested Symbol: " + symbol);
 
             // Respond with a Quote
@@ -71,7 +76,7 @@ public class QuoteApp extends MessageCracker implements Application {
     }
 
     // Handle Quote (MsgType = S)
-    @Override
+    //@Override
     public void onMessage(Quote message, SessionID sessionId) throws FieldNotFound {
         System.out.println("Processing Quote...");
 
@@ -87,7 +92,7 @@ public class QuoteApp extends MessageCracker implements Application {
         QuoteResponse response = new QuoteResponse();
         response.set(new QuoteRespID("RESP-" + quoteId));
         response.set(new QuoteID(quoteId));
-        response.set(new QuoteRespType(QuoteRespType.ACCEPTED)); // Example: Accepted
+        response.set(new QuoteRespType(QuoteRespType.HIT_LIFT)); // Example: Accepted
 
         try {
             Session.sendToTarget(response, sessionId);
@@ -98,7 +103,7 @@ public class QuoteApp extends MessageCracker implements Application {
     }
 
     // Handle Quote Response (MsgType = AJ)
-    @Override
+    //@Override
     public void onMessage(QuoteResponse message, SessionID sessionId) throws FieldNotFound {
         System.out.println("Processing Quote Response...");
 
@@ -106,5 +111,27 @@ public class QuoteApp extends MessageCracker implements Application {
         int responseType = message.getQuoteRespType().getValue();
 
         System.out.printf("Received Quote Response: ID=%s, Type=%d%n", quoteRespId, responseType);
+    }
+    public static void main(String[] args) throws ConfigError {
+        String configFile = "quickfix.cfg"; // Path to the FIX configuration file
+        SessionSettings settings = new SessionSettings(configFile);
+    
+        Application application = new FIXServer();
+        MessageStoreFactory storeFactory = new FileStoreFactory(settings);
+        LogFactory logFactory = new ScreenLogFactory(settings);
+        MessageFactory messageFactory = new DefaultMessageFactory();
+    
+        Initiator initiator = new SocketInitiator(application, storeFactory, settings, logFactory, messageFactory);
+        initiator.start();
+    
+        System.out.println("FIX Application started. Press <Enter> to stop.");
+        try {
+            System.in.read();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    
+        initiator.stop();
+        System.out.println("FIX Application stopped.");
     }
 }
