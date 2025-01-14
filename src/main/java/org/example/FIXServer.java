@@ -112,6 +112,8 @@ public class FIXServer extends MessageCracker implements Application {
 
         System.out.printf("Received Quote Response: ID=%s, Type=%d%n", quoteRespId, responseType);
     }
+
+
     public static void main(String[] args) throws ConfigError {
         String configFile = "quickfix.cfg"; // Path to the FIX configuration file
         SessionSettings settings = new SessionSettings(configFile);
@@ -120,9 +122,9 @@ public class FIXServer extends MessageCracker implements Application {
         MessageStoreFactory storeFactory = new FileStoreFactory(settings);
         LogFactory logFactory = new ScreenLogFactory(settings);
         MessageFactory messageFactory = new DefaultMessageFactory();
-    
-        Initiator initiator = new SocketInitiator(application, storeFactory, settings, logFactory, messageFactory);
-        initiator.start();
+
+        ThreadedSocketAcceptor acceptor = new ThreadedSocketAcceptor(application, storeFactory, settings, logFactory, messageFactory);
+        acceptor.start();
     
         System.out.println("FIX Application started. Press <Enter> to stop.");
         try {
@@ -131,7 +133,7 @@ public class FIXServer extends MessageCracker implements Application {
             e.printStackTrace();
         }
     
-        initiator.stop();
+        acceptor.stop();
         System.out.println("FIX Application stopped.");
     }
 }
