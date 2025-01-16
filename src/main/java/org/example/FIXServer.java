@@ -46,33 +46,32 @@ public class FIXServer extends MessageCracker implements Application {
 
     // Handle Quote Request (MsgType = R)
     //@Override
-    public void onMessage(QuoteRequest message, SessionID sessionId) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue {
+    public void onMessage(QuoteRequest quoteRequest, SessionID sessionId) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue {
         System.out.println("Processing Quote Request...");
 
-        String quoteReqId = message.getQuoteReqID().getValue();
+        String quoteReqId = quoteRequest.getQuoteReqID().getValue();
         System.out.println("QuoteReqID: " + quoteReqId);
 
-        for (Group group : message.getGroups(NoRelatedSym.FIELD)) {
+        try {
+            if (quoteRequest.isSetField(NoRelatedSym.FIELD)) {
+                int noRelatedSymCount = quoteRequest.getInt(NoRelatedSym.FIELD);
+                System.out.println("Number of Related Symbols: " + noRelatedSymCount);
 
-            QuoteRequest.NoRelatedSym noRelatedSym = (QuoteRequest.NoRelatedSym) group;
-            String symbol = noRelatedSym.getSymbol().getValue();
-            System.out.println("Requested Symbol: " + symbol);
+                // Loop through each NoRelatedSym group
+                for (int i = 1; i <= noRelatedSymCount; i++) {
+                    Group relatedSymGroup = quoteRequest.getGroup(i, NoRelatedSym.FIELD);
 
-            // Respond with a Quote
-            Quote quote = new Quote();
-            quote.set(new QuoteID("QUOTE-" + System.currentTimeMillis()));
-            quote.set(new QuoteReqID(quoteReqId));
-            quote.set(new Symbol(symbol));
-            quote.set(new BidPx(100.0)); // Example bid price
-            quote.set(new OfferPx(105.0)); // Example offer price
-
-            try {
-                Session.sendToTarget(quote, sessionId);
-                System.out.println("Sent Quote for symbol: " + symbol);
-            } catch (SessionNotFound e) {
-                System.err.println("Error sending Quote: " + e.getMessage());
+                    // Retrieve fields within the group (e.g., Symbol)
+                    if (relatedSymGroup.isSetField(Symbol.FIELD)) {
+                        String symbol = relatedSymGroup.getString(Symbol.FIELD);
+                        System.out.println("Symbol: " + symbol);
+                    }
+                }
             }
+        }catch(FieldNotFound e) {
+            e.printStackTrace();
         }
+
     }
 
     // Handle Quote (MsgType = S)
